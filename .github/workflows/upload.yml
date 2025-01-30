@@ -14,6 +14,13 @@ jobs:
     steps:
       - name: リポジトリをチェックアウト
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 完全な履歴を取得
+
+      - name: Gitの設定
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Pythonをセットアップ
         uses: actions/setup-python@v4
@@ -26,14 +33,29 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
+      - name: downloadsディレクトリの作成
+        run: mkdir -p downloads
+
       - name: 音楽をダウンロード
         run: |
           python downloader.py "${{ github.event.inputs.url }}"
 
-      - name: WAVファイルをGitHubにコミット
+      - name: ファイルの存在確認とGitへの追加
         run: |
-          git config --local user.name "github-actions"
-          git config --local user.email "github-actions@github.com"
-          git add downloads/*.wav
-          git commit -m "🎵 新しいWAVファイルを追加" || echo "No changes to commit"
-          git push || echo "No changes to push"
+          if [ -n "$(ls -A downloads/*.wav 2>/dev/null)" ]; then
+            echo "WAVファイルが見つかりました"
+            git add downloads/*.wav
+          else
+            echo "WAVファイルが見つかりません"
+            exit 1
+          fi
+
+      - name: 変更の確認とコミット
+        run: |
+          if git diff --cached --quiet; then
+            echo "コミットする変更はありません"
+          else
+            echo "変更をコミットします"
+            git commit -m "🎵 新しいWAVファイルを追加 [skip ci]"
+            git push origin HEAD:main
+          fi
