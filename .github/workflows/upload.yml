@@ -26,7 +26,8 @@ jobs:
           pip install -r requirements.txt
           sudo apt update
           sudo apt install -y chromium-browser chromium-chromedriver
-          sudo ln -s /usr/bin/chromium-browser /usr/bin/google-chrome  # Chrome のパスを正しく設定
+          sudo rm -f /usr/bin/google-chrome  # 既存のシンボリックリンクを削除
+          sudo ln -s /usr/bin/chromium-browser /usr/bin/google-chrome
 
       - name: SoundCloud & Bandcamp から音楽をダウンロード
         run: |
