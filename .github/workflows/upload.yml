@@ -22,11 +22,9 @@ jobs:
 
       - name: 必要なパッケージをインストール
         run: |
-          pip install selenium webdriver_manager yt-dlp
+          pip install yt-dlp
           sudo apt-get update
-          sudo apt-get install -y chromium-browser chromium-chromedriver ffmpeg
-          which chromium-browser
-          which chromedriver
+          sudo apt-get install -y ffmpeg
 
       - name: 音楽をダウンロード
         run: |
