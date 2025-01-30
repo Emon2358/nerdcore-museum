@@ -16,10 +16,6 @@ class MusicDownloader:
         self.ydl_opts = {
             'format': 'bestaudio/best',
             'outtmpl': f'{DOWNLOAD_DIR}/%(title)s.%(ext)s',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'wav',
-            }],
             # プレイリストを許可
             'extract_flat': False,
             'noplaylist': False,
@@ -46,13 +42,11 @@ class MusicDownloader:
                     # プレイリストの場合
                     if 'entries' in info:
                         logger.info(f"✨ プレイリスト「{info.get('title', 'Unknown')}」を検出: {len(info['entries'])} トラック")
-                        # ダウンロードを実行
                         ydl.download([url])
                         logger.info("✅ プレイリストのダウンロードが完了しました！")
                     # 単曲の場合
                     else:
                         logger.info(f"✨ トラック「{info.get('title', 'Unknown')}」を検出")
-                        # ダウンロードを実行
                         ydl.download([url])
                         logger.info("✅ トラックのダウンロードが完了しました！")
                     
