@@ -1,0 +1,39 @@
+name: Upload SoundCloud & Bandcamp WAV Files
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'SoundCloud または Bandcamp の URL を入力'
+        required: true
+        type: string
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Pythonをセットアップ
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: 必要なパッケージをインストール
+        run: |
+          pip install -r requirements.txt
+          sudo apt-get install ffmpeg
+
+      - name: SoundCloud & Bandcamp から音楽をダウンロード
+        run: |
+          python downloader.py "${{ github.event.inputs.url }}"
+
+      - name: WAVファイルをGitHubにコミット
+        run: |
+          git config --local user.name "github-actions"
+          git config --local user.email "github-actions@github.com"
+          git add downloads/*.wav
+          git commit -m "🎵 新しいWAVファイルを追加"
+          git push
