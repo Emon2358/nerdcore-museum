@@ -1,4 +1,4 @@
-name: Upload SoundCloud & Bandcamp WAV Files
+name: Download Music Tracks
 
 on:
   workflow_dispatch:
@@ -9,7 +9,7 @@ on:
         type: string
 
 jobs:
-  upload:
+  download:
     runs-on: ubuntu-latest
     steps:
       - name: リポジトリをチェックアウト
@@ -24,11 +24,11 @@ jobs:
         run: |
           pip install selenium webdriver_manager yt-dlp
           sudo apt-get update
-          sudo apt-get install -y chromium-browser chromium-chromedriver
+          sudo apt-get install -y chromium-browser chromium-chromedriver ffmpeg
           which chromium-browser
           which chromedriver
 
-      - name: SoundCloud & Bandcamp から音楽をダウンロード
+      - name: 音楽をダウンロード
         run: |
           python downloader.py "${{ github.event.inputs.url }}"
 
@@ -37,5 +37,5 @@ jobs:
           git config --local user.name "github-actions"
           git config --local user.email "github-actions@github.com"
           git add downloads/*.wav
-          git commit -m "🎵 新しいWAVファイルを追加"
-          git push
+          git commit -m "🎵 新しいWAVファイルを追加" || echo "No changes to commit"
+          git push || echo "No changes to push"
