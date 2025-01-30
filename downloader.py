@@ -1,9 +1,13 @@
 import os
 import sys
+import time
 import re
 import subprocess
-import requests
-from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 # ダウンロードフォルダ
 DOWNLOAD_DIR = "downloads"
@@ -12,6 +16,78 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 # SoundCloud & Bandcamp のURLチェック
 def is_supported_url(url):
     return "soundcloud.com" in url or "bandcamp.com" in url
+
+# Selenium のセットアップ
+def get_driver():
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920x1080")
+
+    driver = webdriver.Chrome(options=options)
+    return driver
+
+# SoundCloudのトラックURL取得 (Selenium)
+def get_soundcloud_tracks(page_url):
+    print(f"🔍 SoundCloudのページ解析中: {page_url}")
+
+    driver = get_driver()
+    driver.get(page_url)
+
+    try:
+        # JavaScript の読み込みを待つ
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.TAG_NAME, "body"))
+        )
+        time.sleep(3)  # 追加の読み込み待機
+
+        tracks = []
+        links = driver.find_elements(By.TAG_NAME, "a")
+
+        for link in links:
+            href = link.get_attribute("href")
+            if href and "/tracks/" in href:
+                tracks.append(href)
+
+        tracks = list(set(tracks))  # 重複を排除
+        print(f"✅ {len(tracks)} 件のトラックを発見")
+        return tracks
+    except Exception as e:
+        print(f"⚠️ SoundCloudの解析中にエラー発生: {e}")
+        return []
+    finally:
+        driver.quit()
+
+# BandcampのトラックURL取得
+def get_bandcamp_tracks(page_url):
+    print(f"🔍 Bandcampのページ解析中: {page_url}")
+
+    driver = get_driver()
+    driver.get(page_url)
+
+    try:
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.TAG_NAME, "body"))
+        )
+        time.sleep(3)  # 追加の読み込み待機
+
+        tracks = []
+        page_source = driver.page_source
+
+        matches = re.findall(r'"file":{"mp3-128":"(.*?)"}', page_source)
+        for match in matches:
+            tracks.append(match.replace("\\", ""))
+
+        tracks = list(set(tracks))  # 重複を排除
+        print(f"✅ {len(tracks)} 件のトラックを発見")
+        return tracks
+    except Exception as e:
+        print(f"⚠️ Bandcampの解析中にエラー発生: {e}")
+        return []
+    finally:
+        driver.quit()
 
 # 音楽をダウンロード
 def download_track(url):
@@ -28,42 +104,12 @@ def download_track(url):
         "-o", f"{DOWNLOAD_DIR}/%(title)s.%(ext)s",
         url
     ]
-    
+
     try:
         subprocess.run(command, check=True)
         print("✅ ダウンロード完了!")
     except subprocess.CalledProcessError as e:
         print(f"⚠️ エラーが発生しました: {e}")
-
-# SoundCloudのトラックURL取得
-def get_soundcloud_tracks(page_url):
-    print(f"🔍 SoundCloudのページ解析中: {page_url}")
-    response = requests.get(page_url)
-    soup = BeautifulSoup(response.text, "html.parser")
-
-    tracks = []
-    for link in soup.find_all("a", href=True):
-        if "/tracks/" in link["href"]:
-            track_url = f"https://soundcloud.com{link['href']}"
-            tracks.append(track_url)
-
-    return list(set(tracks))
-
-# BandcampのトラックURL取得
-def get_bandcamp_tracks(page_url):
-    print(f"🔍 Bandcampのページ解析中: {page_url}")
-    response = requests.get(page_url)
-    soup = BeautifulSoup(response.text, "html.parser")
-
-    tracks = []
-    for script in soup.find_all("script"):
-        if "trackinfo" in script.text:
-            match = re.search(r'"file":{"mp3-128":"(.*?)"}', script.text)
-            if match:
-                track_url = match.group(1).replace("\\", "")
-                tracks.append(track_url)
-
-    return list(set(tracks))
 
 # メイン処理
 if __name__ == "__main__":
