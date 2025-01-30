@@ -11,7 +11,6 @@ on:
 jobs:
   upload:
     runs-on: ubuntu-latest
-
     steps:
       - name: リポジトリをチェックアウト
         uses: actions/checkout@v4
@@ -23,11 +22,11 @@ jobs:
 
       - name: 必要なパッケージをインストール
         run: |
-          pip install -r requirements.txt
-          sudo apt update
-          sudo apt install -y chromium-browser chromium-chromedriver
-          sudo rm -f /usr/bin/google-chrome  # 既存のシンボリックリンクを削除
-          sudo ln -s /usr/bin/chromium-browser /usr/bin/google-chrome
+          pip install selenium webdriver_manager yt-dlp
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser chromium-chromedriver
+          which chromium-browser
+          which chromedriver
 
       - name: SoundCloud & Bandcamp から音楽をダウンロード
         run: |
