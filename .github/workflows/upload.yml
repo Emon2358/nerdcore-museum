@@ -42,11 +42,11 @@ jobs:
 
       - name: ファイルの存在確認とGitへの追加
         run: |
-          if [ -n "$(ls -A downloads/*.wav 2>/dev/null)" ]; then
-            echo "WAVファイルが見つかりました"
-            git add downloads/*.wav
+          if [ -n "$(ls -A downloads/*.mp3 2>/dev/null)" ]; then
+            echo "MP3ファイルが見つかりました"
+            git add downloads/*.mp3
           else
-            echo "WAVファイルが見つかりません"
+            echo "MP3ファイルが見つかりません"
             exit 1
           fi
 
@@ -56,6 +56,6 @@ jobs:
             echo "コミットする変更はありません"
           else
             echo "変更をコミットします"
-            git commit -m "🎵 新しいWAVファイルを追加 [skip ci]"
+            git commit -m "🎵 新しいMP3ファイルを追加 [skip ci]"
             git push origin HEAD:main
           fi
