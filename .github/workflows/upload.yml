@@ -7,6 +7,10 @@ on:
         description: 'SoundCloud または Bandcamp の URL を入力'
         required: true
         type: string
+      scrape_internal_links:
+        description: '内部リンクをスクレイピングしますか？ (true/false)'
+        required: true
+        type: boolean
 
 jobs:
   download:
@@ -29,7 +33,7 @@ jobs:
 
       - name: 必要なパッケージをインストール
         run: |
-          pip install yt-dlp
+          pip install yt-dlp beautifulsoup4
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
@@ -38,7 +42,7 @@ jobs:
 
       - name: 音楽をダウンロード
         run: |
-          python downloader.py "${{ github.event.inputs.url }}"
+          python downloader.py "${{ github.event.inputs.url }}" "${{ github.event.inputs.scrape_internal_links }}"
 
       - name: ファイルの存在確認とGitへの追加
         run: |
@@ -58,4 +62,3 @@ jobs:
             echo "変更をコミットします"
             git commit -m "🎵 新しいMP3ファイルを追加 [skip ci]"
             git push origin HEAD:main
-          fi
