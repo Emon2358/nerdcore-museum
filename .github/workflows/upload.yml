@@ -53,7 +53,7 @@ jobs:
 
       - name: 必要なパッケージをインストール
         run: |
-          pip install yt-dlp requests
+          pip install yt-dlp requests beautifulsoup4
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
