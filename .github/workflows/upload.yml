@@ -1,5 +1,4 @@
 name: Download Music Tracks
-
 on:
   workflow_dispatch:
     inputs:
@@ -23,7 +22,6 @@ on:
           - archive
           - direct_link
         default: auto_detect
-
 jobs:
   download:
     runs-on: ubuntu-latest
@@ -32,17 +30,18 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0  # 完全な履歴を取得
-
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Gitの設定
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
+      - name: リモートの変更を取得
+        run: |
+          git pull origin main --ff-only || (git fetch origin && git reset --hard origin/main)
       - name: Pythonをセットアップ
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-
       - name: Pythonの依存関係をインストール
         run: |
           python -m pip install --upgrade pip
@@ -50,16 +49,13 @@ jobs:
             yt-dlp \
             setuptools \
             wheel
-
       - name: 必要なパッケージをインストール
         run: |
           pip install yt-dlp requests beautifulsoup4
           sudo apt-get update
           sudo apt-get install -y ffmpeg
-
       - name: downloadsディレクトリの作成
         run: mkdir -p downloads
-
       - name: 音楽をダウンロード
         env:
           INPUT_URL: ${{ github.event.inputs.url }}
@@ -67,17 +63,14 @@ jobs:
           INPUT_SOURCE_TYPE: ${{ github.event.inputs.source_type }}
         run: |
           python downloader.py "$INPUT_URL" "$INPUT_SCRAPE_LINKS" "$INPUT_SOURCE_TYPE"
-
       - name: ダウンロードされたファイルの確認
         run: |
           echo "ダウンロードされたファイル:"
           ls -la downloads/
-
       - name: ファイルの存在確認とGitへの追加
         run: |
           # 音楽ファイルを見つけて配列に格納
           IFS=$'\n' read -d '' -r -a MUSIC_FILES < <(find downloads -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \) && printf '\0')
-
           if [ ${#MUSIC_FILES[@]} -gt 0 ]; then
             echo "音楽ファイルが見つかりました"
             for file in "${MUSIC_FILES[@]}"; do
@@ -88,7 +81,6 @@ jobs:
             echo "音楽ファイルが見つかりません"
             exit 1
           fi
-
       - name: 変更の確認とコミット
         run: |
           if git diff --cached --quiet; then
@@ -97,5 +89,6 @@ jobs:
           else
             echo "変更をコミットします"
             git commit -m "🎵 新しい音楽ファイルを追加 [skip ci]"
+            git pull --rebase origin main
             git push origin HEAD:main
           fi
