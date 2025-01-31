@@ -1,14 +1,14 @@
-name: Download Music Tracks
+name: Download and Upload MP3
 
 on:
   workflow_dispatch:
     inputs:
       url:
-        description: 'ダウンロードするURLを入力'
+        description: 'ダウンロードするURL'
         required: true
         type: string
       scrape_internal_links:
-        description: '内部リンクをスクレイピングしますか？'
+        description: '内部リンクをスクレイピングするか'
         required: true
         type: boolean
         default: false
@@ -25,8 +25,9 @@ on:
         default: auto_detect
 
 jobs:
-  download:
+  download_and_upload:
     runs-on: ubuntu-latest
+
     steps:
       - name: リポジトリをチェックアウト
         uses: actions/checkout@v4
@@ -55,15 +56,17 @@ jobs:
         run: |
           python downloader.py "$INPUT_URL" "$INPUT_SCRAPE_LINKS" "$INPUT_SOURCE_TYPE"
 
-      - name: .gitattributesを更新
+      - name: .gitattributes を設定（MP3を正しく扱う）
         run: |
-          echo "*.mp3 mime-type=audio/mpeg" > downloads/.gitattributes
-          git add downloads/.gitattributes
-          git commit -m "🔄 `.gitattributes` を更新 (MP3 MIME type 設定)" || exit 0
-          git push origin HEAD:main
+          echo "*.mp3 filter=lfs diff=lfs binary" > downloads/.gitattributes
+          echo "*.mp3 linguist-language=Audio" >> downloads/.gitattributes
+          echo "*.mp3 mime-type=audio/mpeg" >> downloads/.gitattributes
 
-      - name: ダウンロードされたファイルをGitHubに追加
+      - name: MP3ファイルをGitHubに追加 & プッシュ
         run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
           git add downloads/
-          git commit -m "🎵 新しい音楽ファイルを追加 [skip ci]" || exit 0
+          git commit -m "🎵 MP3ファイルを追加: $(date)" || exit 0
           git push origin HEAD:main
