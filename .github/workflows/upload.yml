@@ -56,7 +56,7 @@ jobs:
         run: |
           python downloader.py "$INPUT_URL" "$INPUT_SCRAPE_LINKS" "$INPUT_SOURCE_TYPE"
 
-      - name: `.gitattributes` を設定（MP3を正しく扱う）
+      - name: .gitattributes を設定（MP3を正しく扱う）
         run: |
           echo "*.mp3 filter=lfs diff=lfs binary" > downloads/.gitattributes
           echo "*.mp3 linguist-language=Audio" >> downloads/.gitattributes
