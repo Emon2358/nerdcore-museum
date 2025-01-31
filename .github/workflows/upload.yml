@@ -1,3 +1,8 @@
+
+
+Verify
+Run
+Copy code
 name: Download Music Tracks
 
 on:
@@ -75,10 +80,15 @@ jobs:
 
       - name: ファイルの存在確認とGitへの追加
         run: |
-          MUSIC_FILES=$(find downloads -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \) -print0)
-          if [ -n "$MUSIC_FILES" ]; then
+          # ファイルを個別に追加
+          for file in $(find downloads -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \)); do
+            echo "追加するファイル: $file"
+            git add "$file"
+          done
+
+          # ファイルが存在するかチェック
+          if [ -n "$(find downloads -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \))" ]; then
             echo "音楽ファイルが見つかりました"
-            printf '%s\0' "$MUSIC_FILES" | xargs -0 git add
           else
             echo "音楽ファイルが見つかりません"
             exit 1
