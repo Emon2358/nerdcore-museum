@@ -75,15 +75,15 @@ jobs:
 
       - name: ファイルの存在確認とGitへの追加
         run: |
-          # ファイルを個別に追加
-          for file in $(find downloads -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \)); do
-            echo "追加するファイル: $file"
-            git add "$file"
-          done
+          # 音楽ファイルを見つけて配列に格納
+          IFS=$'\n' read -d '' -r -a MUSIC_FILES < <(find downloads -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \) && printf '\0')
 
-          # ファイルが存在するかチェック
-          if [ -n "$(find downloads -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \))" ]; then
+          if [ ${#MUSIC_FILES[@]} -gt 0 ]; then
             echo "音楽ファイルが見つかりました"
+            for file in "${MUSIC_FILES[@]}"; do
+              echo "追加するファイル: $file"
+              git add "$file"
+            done
           else
             echo "音楽ファイルが見つかりません"
             exit 1
