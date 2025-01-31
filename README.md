@@ -9,4 +9,4 @@
 
 　　：はんだやレイヴ(八卦商会)ファック!マルチね☆彡REMIXES　SUPER STAR FOURTH　
 　　　
-　　　　　すだちょろぱer☆BBS (仮称)
+　　　　　　　　すだちょろぱer☆BBS (仮称)
