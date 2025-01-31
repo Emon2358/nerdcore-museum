@@ -67,6 +67,12 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
+          # 最新のリモート変更を取得してリベース（競合回避）
+          git pull --rebase origin main
+          
+          # MP3ファイルを追加
           git add downloads/
           git commit -m "🎵 MP3ファイルを追加: $(date)" || exit 0
-          git push origin HEAD:main
+
+          # プッシュ（競合がある場合でも安全に上書き）
+          git push --force-with-lease origin HEAD:main
