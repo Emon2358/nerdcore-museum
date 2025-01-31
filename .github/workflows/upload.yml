@@ -75,10 +75,10 @@ jobs:
 
       - name: ファイルの存在確認とGitへの追加
         run: |
-          MUSIC_FILES=$(find downloads -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \))
+          MUSIC_FILES=$(find downloads -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \) -print0)
           if [ -n "$MUSIC_FILES" ]; then
             echo "音楽ファイルが見つかりました"
-            git add $MUSIC_FILES
+            printf '%s\0' "$MUSIC_FILES" | xargs -0 git add
           else
             echo "音楽ファイルが見つかりません"
             exit 1
