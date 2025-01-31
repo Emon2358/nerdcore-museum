@@ -1,0 +1,3 @@
+*.mp3 text eol=lf filter=lfs diff=lfs binary
+*.mp3 linguist-language=Audio
+*.mp3 mime-type=audio/mpeg
