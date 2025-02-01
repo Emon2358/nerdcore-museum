@@ -6,5 +6,5 @@
 >        　 :DJ TECHNORCH　BOSS ON PARADE 〜XXX meets GABBA〜
 >        　 :暗黒神話　暗黒神話のWORKS 2011-2013
 >           :m1dy Early J-core Archive 2001-2003 (日本國民時代)
->           :日本國民 synthe宮　PUMP ACTION VER. 0.5 REBOOT
+>           :日本國民 synthe宮　PUMP ACTION VER. 0.5 REBOOT　はじめてのにほんこくみん
 >           :Traffic Jammies　キチク
