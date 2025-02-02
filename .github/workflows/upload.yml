@@ -1,4 +1,5 @@
-name: Download Music Tracks
+name: Download and Process Music
+
 on:
   workflow_dispatch:
     inputs:
@@ -7,7 +8,7 @@ on:
         required: true
         type: string
       folder_name:
-        description: 'Torrent内の対象フォルダ名'
+        description: 'Torrent内の対象フォルダ名 (torrentの場合のみ)'
         required: false
         type: string
       scrape_internal_links:
@@ -27,6 +28,7 @@ on:
           - direct_link
           - torrent
         default: auto_detect
+
 jobs:
   download:
     runs-on: ubuntu-latest
@@ -36,52 +38,80 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Gitの設定
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-      
+
       - name: 必要なパッケージをインストール
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg aria2
-          pip install yt-dlp requests beautifulsoup4
-      
+          sudo apt-get install -y ffmpeg aria2 wget
+
       - name: downloadsディレクトリの作成
-        run: mkdir -p downloads/torrents
-      
+        run: mkdir -p downloads/torrents downloads/filtered
+
       - name: Torrentをダウンロードして展開
         if: ${{ github.event.inputs.source_type == 'torrent' }}
         env:
           INPUT_URL: ${{ github.event.inputs.url }}
-          INPUT_FOLDER_NAME: ${{ github.event.inputs.folder_name }}
         run: |
           if [[ "$INPUT_URL" == magnet:* ]]; then
-            aria2c --dir=downloads --seed-time=0 "$INPUT_URL"
+            echo "Magnetリンクをダウンロード中: $INPUT_URL"
+            aria2c --dir=downloads --seed-time=0 \
+                   --max-connection-per-server=16 \
+                   --split=16 --min-split-size=1M \
+                   --max-overall-download-limit=0 --max-download-limit=0 \
+                   --bt-max-peers=200 --bt-request-peer-speed-limit=0 \
+                   --bt-enable-lpd=true --bt-tracker-connect-timeout=5 \
+                   --bt-tracker-timeout=10 --bt-seed-unverified=true \
+                   --enable-dht=true --dht-listen-port=6881 \
+                   --file-allocation=none "$INPUT_URL"
           elif [[ "$INPUT_URL" == *.torrent ]]; then
+            echo "Torrentファイルをダウンロード: $INPUT_URL"
             wget -O "downloads/torrents/music.torrent" "$INPUT_URL"
-            aria2c --dir=downloads --seed-time=0 "downloads/torrents/music.torrent"
+            aria2c --dir=downloads --seed-time=0 \
+                   --max-connection-per-server=16 \
+                   --split=16 --min-split-size=1M \
+                   --max-overall-download-limit=0 --max-download-limit=0 \
+                   --bt-max-peers=200 --bt-request-peer-speed-limit=0 \
+                   --bt-enable-lpd=true --bt-tracker-connect-timeout=5 \
+                   --bt-tracker-timeout=10 --bt-seed-unverified=true \
+                   --enable-dht=true --dht-listen-port=6881 \
+                   --file-allocation=none "downloads/torrents/music.torrent"
           else
             echo "⚠️ 無効なTorrent URL"
             exit 1
           fi
-      
-      - name: 指定フォルダのMP3のみを取得
+
+      - name: 指定フォルダの音楽ファイルを取得 (Torrent用)
         if: ${{ github.event.inputs.source_type == 'torrent' && github.event.inputs.folder_name != '' }}
         env:
           INPUT_FOLDER_NAME: ${{ github.event.inputs.folder_name }}
         run: |
           TARGET_DIR=$(find downloads -type d -name "$INPUT_FOLDER_NAME" -print -quit)
           if [[ -d "$TARGET_DIR" ]]; then
-            mkdir -p downloads/filtered
-            find "$TARGET_DIR" -type f -name "*.mp3" -exec mv {} downloads/filtered/ \;
+            echo "対象フォルダが見つかりました: $TARGET_DIR"
+            find "$TARGET_DIR" -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \) -exec mv {} downloads/filtered/ \;
           else
             echo "⚠️ 指定フォルダが見つかりません"
             exit 1
           fi
-      
-      - name: その他のソースから音楽をダウンロード
+
+      - name: Pythonをセットアップ (一般ダウンロード)
+        if: ${{ github.event.inputs.source_type != 'torrent' }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Pythonの依存関係をインストール (一般ダウンロード)
+        if: ${{ github.event.inputs.source_type != 'torrent' }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install yt-dlp requests beautifulsoup4 setuptools wheel
+
+      - name: 音楽をダウンロード (一般ダウンロード)
         if: ${{ github.event.inputs.source_type != 'torrent' }}
         env:
           INPUT_URL: ${{ github.event.inputs.url }}
@@ -89,17 +119,30 @@ jobs:
           INPUT_SOURCE_TYPE: ${{ github.event.inputs.source_type }}
         run: |
           python downloader.py "$INPUT_URL" "$INPUT_SCRAPE_LINKS" "$INPUT_SOURCE_TYPE"
-      
-      - name: Gitに追加・プッシュ
+
+      - name: ファイルの確認
         run: |
-          IFS=$'\n' read -d '' -r -a MUSIC_FILES < <(find downloads -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \) && printf '\0')
-          if [ ${#MUSIC_FILES[@]} -gt 0 ]; then
-            for file in "${MUSIC_FILES[@]}"; do
-              git add "$file"
-            done
-            git commit -m "🎵 新しい音楽ファイルを追加 [skip ci]" || echo "No changes to commit"
+          echo "ダウンロードされたファイル:"
+          find downloads -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \) -exec echo "見つかった音楽ファイル: {}" \;
+
+      - name: 音楽ファイルをGitに追加
+        run: |
+          find downloads -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \) | while read file; do
+            echo "追加するファイル: $file"
+            git add "$file"
+          done
+
+      - name: 変更の確認とコミット
+        run: |
+          if git diff --cached --quiet; then
+            echo "コミットする変更はありません"
+            exit 0
+          else
+            echo "変更をコミットします"
+            git commit -m "🎵 新しい音楽ファイルを追加 [skip ci]"
             git pull --rebase origin main
             git push origin HEAD:main
-          else
-            echo "⚠️ 音楽ファイルが見つかりません"
-            exit 1
+          fi
+
+      - name: 処理完了
+        run: echo "✅ すべての処理が完了しました！"
