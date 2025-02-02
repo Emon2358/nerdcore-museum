@@ -47,7 +47,8 @@ jobs:
       - name: 必要なパッケージをインストール
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg aria2 wget
+          sudo apt-get install -y ffmpeg wget nodejs npm
+          sudo npm install -g webtorrent-cli
 
       - name: downloadsディレクトリの作成
         run: mkdir -p downloads/torrents downloads/filtered
@@ -58,16 +59,13 @@ jobs:
           INPUT_URL: ${{ github.event.inputs.url }}
         run: |
           if [[ "$INPUT_URL" == magnet:* ]]; then
-            aria2c --dir=downloads --seed-time=0 \
-                   --max-connection-per-server=16 --split=16 --min-split-size=1M \
-                   --bt-max-peers=200 --bt-enable-lpd=true --enable-dht=true \
-                   --file-allocation=none "$INPUT_URL"
+            echo "⚡ Magnetリンクをダウンロード中..."
+            webtorrent download "$INPUT_URL" --out downloads/torrents --verbose
           elif [[ "$INPUT_URL" == *.torrent ]]; then
+            echo "🌐 .torrentファイルを取得中..."
             wget -O "downloads/torrents/music.torrent" "$INPUT_URL"
-            aria2c --dir=downloads --seed-time=0 \
-                   --max-connection-per-server=16 --split=16 --min-split-size=1M \
-                   --bt-max-peers=200 --bt-enable-lpd=true --enable-dht=true \
-                   --file-allocation=none "downloads/torrents/music.torrent"
+            echo "⚡ Torrentをダウンロード中..."
+            webtorrent download "downloads/torrents/music.torrent" --out downloads/torrents --verbose
           else
             echo "⚠️ 無効なTorrent URL"
             exit 1
@@ -78,10 +76,13 @@ jobs:
         env:
           INPUT_FOLDER_NAME: ${{ github.event.inputs.folder_name }}
         run: |
-          TARGET_DIR=$(find downloads -type d -name "$INPUT_FOLDER_NAME" -print -quit)
+          TARGET_DIR=$(find downloads/torrents -type d -name "$INPUT_FOLDER_NAME" -print -quit)
           if [[ -d "$TARGET_DIR" ]]; then
-            echo "対象フォルダが見つかりました: $TARGET_DIR"
-            find "$TARGET_DIR" -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \) -exec mv {} downloads/filtered/ \;
+            echo "🎵 対象フォルダが見つかりました: $TARGET_DIR"
+            find "$TARGET_DIR" -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \) | while read file; do
+              echo "✅ ファイル取得: $file"
+              mv "$file" downloads/filtered/
+            done
           else
             echo "⚠️ 指定フォルダが見つかりません"
             exit 1
@@ -111,7 +112,7 @@ jobs:
       - name: 音楽ファイルをGitに追加 & プッシュ
         run: |
           find downloads/filtered -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \) | while read file; do
-            echo "追加するファイル: $file"
+            echo "🎵 追加するファイル: $file"
             git add "$file"
             git commit -m "🎵 新しい音楽ファイルを追加: $(basename "$file") [skip ci]"
             git pull --rebase origin main
