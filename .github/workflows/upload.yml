@@ -58,6 +58,7 @@ jobs:
         env:
           INPUT_URL: ${{ github.event.inputs.url }}
         run: |
+          set +e
           if [[ "$INPUT_URL" == magnet:* ]]; then
             echo "⚡ Magnetリンクをダウンロード中..."
             webtorrent download "$INPUT_URL" --out downloads/torrents --verbose
@@ -76,6 +77,7 @@ jobs:
         env:
           INPUT_FOLDER_NAME: ${{ github.event.inputs.folder_name }}
         run: |
+          set +e
           TARGET_DIR=$(find downloads/torrents -type d -name "$INPUT_FOLDER_NAME" -print -quit)
           if [[ -d "$TARGET_DIR" ]]; then
             echo "🎵 対象フォルダが見つかりました: $TARGET_DIR"
@@ -107,17 +109,21 @@ jobs:
           INPUT_SCRAPE_LINKS: ${{ github.event.inputs.scrape_internal_links }}
           INPUT_SOURCE_TYPE: ${{ github.event.inputs.source_type }}
         run: |
+          set +e
           python downloader.py "$INPUT_URL" "$INPUT_SCRAPE_LINKS" "$INPUT_SOURCE_TYPE"
 
       - name: 音楽ファイルをGitに追加 & プッシュ
         run: |
+          set +e
           find downloads/filtered -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \) | while read file; do
             echo "🎵 追加するファイル: $file"
             git add "$file"
-            git commit -m "🎵 新しい音楽ファイルを追加: $(basename "$file") [skip ci]"
-            git pull --rebase origin main
-            git push origin HEAD:main
+            
+            if git status --porcelain | grep -q "$file"; then
+              git commit -m "🎵 新しい音楽ファイルを追加: $(basename "$file") [skip ci]" || true
+              git pull --rebase origin main || true
+              git push origin HEAD:main || true
+            else
+              echo "⚠️ 変更がないためコミットをスキップ: $file"
+            fi
           done
-
-      - name: 処理完了
-        run: echo "✅ すべての処理が完了しました！"
