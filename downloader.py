@@ -72,7 +72,7 @@ class MusicDownloader:
 
             # マグネットリンクまたはトレントファイルの処理
             if url.startswith('magnet:'):
-                logger.info(f"マグネットリンクのダウンロードを開始: {url}")  # ここでログを出す
+                logger.info("マグネットリンクのダウンロードを開始")
                 cmd = ['aria2c'] + aria2c_options + [url]
             else:
                 logger.info("トレントファイルのダウンロードを開始")
@@ -167,7 +167,6 @@ class MusicDownloader:
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                logger.info(f"yt-dlpでダウンロードを開始: {url}")
                 ydl.download([url])
             return True
         except Exception as e:
@@ -189,8 +188,7 @@ class MusicDownloader:
                     filename = 'downloaded_file.mp3'
             
             file_path = os.path.join(self.filtered_dir, filename)
-            logger.info(f"直接ダウンロード中: {filename} を {file_path} に保存")
-
+            
             with open(file_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
