@@ -58,27 +58,15 @@ jobs:
           INPUT_URL: ${{ github.event.inputs.url }}
         run: |
           if [[ "$INPUT_URL" == magnet:* ]]; then
-            echo "Magnetリンクをダウンロード中: $INPUT_URL"
             aria2c --dir=downloads --seed-time=0 \
-                   --max-connection-per-server=16 \
-                   --split=16 --min-split-size=1M \
-                   --max-overall-download-limit=0 --max-download-limit=0 \
-                   --bt-max-peers=200 --bt-request-peer-speed-limit=0 \
-                   --bt-enable-lpd=true --bt-tracker-connect-timeout=5 \
-                   --bt-tracker-timeout=10 --bt-seed-unverified=true \
-                   --enable-dht=true --dht-listen-port=6881 \
+                   --max-connection-per-server=16 --split=16 --min-split-size=1M \
+                   --bt-max-peers=200 --bt-enable-lpd=true --enable-dht=true \
                    --file-allocation=none "$INPUT_URL"
           elif [[ "$INPUT_URL" == *.torrent ]]; then
-            echo "Torrentファイルをダウンロード: $INPUT_URL"
             wget -O "downloads/torrents/music.torrent" "$INPUT_URL"
             aria2c --dir=downloads --seed-time=0 \
-                   --max-connection-per-server=16 \
-                   --split=16 --min-split-size=1M \
-                   --max-overall-download-limit=0 --max-download-limit=0 \
-                   --bt-max-peers=200 --bt-request-peer-speed-limit=0 \
-                   --bt-enable-lpd=true --bt-tracker-connect-timeout=5 \
-                   --bt-tracker-timeout=10 --bt-seed-unverified=true \
-                   --enable-dht=true --dht-listen-port=6881 \
+                   --max-connection-per-server=16 --split=16 --min-split-size=1M \
+                   --bt-max-peers=200 --bt-enable-lpd=true --enable-dht=true \
                    --file-allocation=none "downloads/torrents/music.torrent"
           else
             echo "⚠️ 無効なTorrent URL"
@@ -120,29 +108,15 @@ jobs:
         run: |
           python downloader.py "$INPUT_URL" "$INPUT_SCRAPE_LINKS" "$INPUT_SOURCE_TYPE"
 
-      - name: ファイルの確認
+      - name: 音楽ファイルをGitに追加 & プッシュ
         run: |
-          echo "ダウンロードされたファイル:"
-          find downloads -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \) -exec echo "見つかった音楽ファイル: {}" \;
-
-      - name: 音楽ファイルをGitに追加
-        run: |
-          find downloads -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \) | while read file; do
+          find downloads/filtered -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \) | while read file; do
             echo "追加するファイル: $file"
             git add "$file"
-          done
-
-      - name: 変更の確認とコミット
-        run: |
-          if git diff --cached --quiet; then
-            echo "コミットする変更はありません"
-            exit 0
-          else
-            echo "変更をコミットします"
-            git commit -m "🎵 新しい音楽ファイルを追加 [skip ci]"
+            git commit -m "🎵 新しい音楽ファイルを追加: $(basename "$file") [skip ci]"
             git pull --rebase origin main
             git push origin HEAD:main
-          fi
+          done
 
       - name: 処理完了
         run: echo "✅ すべての処理が完了しました！"
