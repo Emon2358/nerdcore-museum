@@ -75,6 +75,10 @@ class MusicDownloader:
             'verbose': True,
             'quiet': False,
             'no_warnings': False,
+            'http_headers': {
+                'User -Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.85 Safari/537.36',
+                'Referer': url  # リファラーを設定
+            }
         }
 
         if source_type == "soundcloud":
@@ -93,7 +97,7 @@ class MusicDownloader:
             })
 
         try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            with yt_d lp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
             return True
         except Exception as e:
