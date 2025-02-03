@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       url:
-        description: 'ダウンロードするURLを入力'
+        description: 'ダウンロードするURLをカンマ区切りで入力'
         required: true
         type: string
       scrape_internal_links:
@@ -66,7 +66,11 @@ jobs:
           INPUT_SCRAPE_LINKS: ${{ github.event.inputs.scrape_internal_links }}
           INPUT_SOURCE_TYPE: ${{ github.event.inputs.source_type }}
         run: |
-          python downloader.py "$INPUT_URL" "$INPUT_SCRAPE_LINKS" "$INPUT_SOURCE_TYPE"
+          # カンマ区切りのURLを分割して配列に格納
+          IFS=',' read -r -a URL_ARRAY <<< "$INPUT_URL"
+          for url in "${URL_ARRAY[@]}"; do
+            python downloader.py "$url" "$INPUT_SCRAPE_LINKS" "$INPUT_SOURCE_TYPE"
+          done
 
       - name: ダウンロードされたファイルの確認
         run: |
