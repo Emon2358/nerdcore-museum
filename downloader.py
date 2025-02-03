@@ -119,18 +119,22 @@ class MusicDownloader:
 def main():
     if len(sys.argv) < 4:
         logger.error("❌ URLとダウンロード方法、ソースタイプが指定されていません。")
-        print("使用方法: python downloader.py <URL> <scrape_internal_links> <source_type>")
+        print("使用方法: python downloader.py <URL1> <URL2> ... <scrape_internal_links> <source_type>")
         sys.exit(1)
 
-    url = sys.argv[1]
-    scrape_internal_links = sys.argv[2].lower() == 'true'
-    source_type = sys.argv[3]
+    # 最後の2つの引数を取得
+    scrape_internal_links = sys.argv[-2].lower() == 'true'
+    source_type = sys.argv[-1]
+
+    # 最初の引数からURLを取得
+    urls = sys.argv[1:-2]
 
     downloader = MusicDownloader()
     
-    success = downloader.download(url, scrape_internal_links, source_type)
-    if not success:
-        sys.exit(1)
+    for url in urls:
+        success = downloader.download(url, scrape_internal_links, source_type)
+        if not success:
+            logger.error(f"❌ {url} のダウンロードに失敗しました。")
 
 if __name__ == "__main__":
     main()
