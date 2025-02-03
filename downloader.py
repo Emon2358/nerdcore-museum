@@ -59,12 +59,17 @@ class MusicDownloader:
                     logger.error("🚫 SoundCloudまたはBandcampのURLを指定してください。")
                     return False
             
+            # スクレイピングして内部リンクを取得
+            internal_links = []
             if scrape_internal_links or source_type == 'archive':
                 internal_links = self.scrape_internal_links(url)
-                for link in internal_links:
-                    self.download_track(link)
-            else:
-                self.download_track(url)
+            
+            # URLをダウンロード
+            self.download_track(url)
+            
+            # スクレイピングしたリンクもダウンロード
+            for link in internal_links:
+                self.download_track(link)
                 
             return True
             
