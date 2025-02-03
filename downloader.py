@@ -1,12 +1,15 @@
 import os
+import re
 import sys
-import yt_dlp
 import logging
-from urllib.request import urlopen
-from urllib.parse import urljoin
+import requests
+import yt_dlp
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse, urljoin
 from html.parser import HTMLParser
+from urllib.request import urlopen
 
-# ロギングの設定
+# ロギング設定
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -23,13 +26,37 @@ class LinkParser(HTMLParser):
     def handle_starttag(self, tag, attrs):
         if tag == 'a':
             for name, value in attrs:
-                if name == 'href' and (
-                    value.endswith('.mp3') or 
-                    value.endswith('.wav') or  
-                    value.endswith('.m4a')
-                ):
+                if name == 'href' and (value.endswith('.mp3') or value.endswith('.wav') or value.endswith('.m4a')):
                     full_url = urljoin(self.base_url, value)
                     self.links.append(full_url)
+
+class VKLinkParser:
+    def __init__(self, url):
+        self.url = url
+        self.session = requests.Session()
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+
+    def get_html(self):
+        response = self.session.get(self.url, headers=self.headers)
+        response.raise_for_status()
+        return response.text
+
+    def scrape_internal_links(self):
+        html = self.get_html()
+        soup = BeautifulSoup(html, 'html.parser')
+        links = []
+        
+        for a_tag in soup.find_all('a', class_='vkuiLink'):
+            href = a_tag.get('href', '')
+            file_type = a_tag.find('span', class_='vkitChipAttachment__nowrap--Uv0dn')
+            
+            if href and file_type and '.zip' in file_type.text:
+                full_url = urljoin(self.url, href)
+                links.append(full_url)
+        
+        return links
 
 class MusicDownloader:
     def __init__(self):
@@ -44,32 +71,21 @@ class MusicDownloader:
         }
 
     def download(self, url, scrape_internal_links=False, source_type='auto_detect'):
-        """指定されたURLからトラックをダウンロード"""
         try:
             logger.info(f"🎵 解析とダウンロードを開始: {url}")
             
-            # ソースタイプの判定
             if source_type == 'auto_detect':
                 source_type = self.detect_source_type(url)
             
-            # ソースタイプに基づいたダウンロード
-            if source_type in ['soundcloud', 'bandcamp', 'direct_link']:
-                if not any(platform in url for platform in ['soundcloud.com', 'bandcamp.com']):
-                    logger.error("🚫 SoundCloudまたはBandcampのURLを指定してください。")
-                    return False
-            
-            # スクレイピングして内部リンクを取得
             internal_links = []
-            if scrape_internal_links or source_type == 'archive':
-                internal_links = self.scrape_internal_links(url)
+            if scrape_internal_links or source_type in ['archive', 'vk']:
+                internal_links = self.scrape_internal_links(url, source_type)
             
-            # URLをダウンロード
             self.download_track(url)
             
-            # スクレイピングしたリンクもダウンロード
             for link in internal_links:
                 self.download_track(link)
-                
+            
             return True
             
         except Exception as e:
@@ -77,37 +93,38 @@ class MusicDownloader:
             return False
 
     def detect_source_type(self, url):
-        """URLからソースタイプを自動検出"""
         if 'archive.org' in url:
             return 'archive'
         elif 'soundcloud.com' in url:
             return 'soundcloud'
         elif 'bandcamp.com' in url:
             return 'bandcamp'
+        elif 'vk.com' in url:
+            return 'vk'
         else:
             return 'direct_link'
 
-    def scrape_internal_links(self, url):
-        """指定されたURLから内部リンクをスクレイピング"""
+    def scrape_internal_links(self, url, source_type):
         logger.info(f"🔍 内部リンクをスクレイピング中: {url}")
         
-        # URLからHTMLを取得
-        try:
-            with urlopen(url) as response:
-                html = response.read().decode('utf-8')
-        except Exception as e:
-            logger.error(f"URLを開けませんでした: {e}")
-            return []
-
-        # リンクを解析
-        parser = LinkParser(url)
-        parser.feed(html)
+        if source_type == 'archive':
+            try:
+                with urlopen(url) as response:
+                    html = response.read().decode('utf-8')
+            except Exception as e:
+                logger.error(f"URLを開けませんでした: {e}")
+                return []
+            parser = LinkParser(url)
+            parser.feed(html)
+            return parser.links
         
-        logger.info(f"✨ 見つかった内部リンク: {parser.links}")
-        return parser.links
+        elif source_type == 'vk':
+            vk_parser = VKLinkParser(url)
+            return vk_parser.scrape_internal_links()
+        
+        return []
 
     def download_track(self, url):
-        """トラックをダウンロード"""
         with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
             try:
                 info = ydl.extract_info(url, download=True)
@@ -121,11 +138,8 @@ def main():
         print("使用方法: python downloader.py <URL1> <URL2> ... <scrape_internal_links> <source_type>")
         sys.exit(1)
 
-    # 最後の2つの引数を取得
     scrape_internal_links = sys.argv[-2].lower() == 'true'
     source_type = sys.argv[-1]
-
-    # 最初の引数からURLを取得
     urls = sys.argv[1:-2]
 
     downloader = MusicDownloader()
