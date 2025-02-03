@@ -71,8 +71,8 @@ jobs:
 
       - name: ファイルの処理とGitへの追加
         run: |
-          if [[ "$INPUT_SOURCE_TYPE" == "direct_link" && "$INPUT_URL" =~ ^https:\/\/vk\.com\/ ]]; then
-            echo "VKリンクのため、ZIP化せずに直接追加"
+          if [[ "$INPUT_SOURCE_TYPE" == "direct_link" && ( "$INPUT_URL" =~ ^https:\/\/vk\.com\/ || "$INPUT_URL" =~ ^https:\/\/psv4\.userapi\.com\/ ) ]]; then
+            echo "VKまたはPSV4リンクのため、ZIP化せずに直接追加"
             IFS=$'\n' read -d '' -r -a MUSIC_FILES < <(find downloads -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.m4a" \) && printf '\0')
             if [ ${#MUSIC_FILES[@]} -gt 0 ]; then
               git add downloads/*
