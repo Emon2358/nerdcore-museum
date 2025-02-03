@@ -81,9 +81,10 @@ jobs:
               exit 1
             fi
           else
-            echo "通常のダウンロード処理、ZIP化して追加"
-            zip -r downloads/music_files.zip downloads/*
-            git add downloads/music_files.zip
+            echo "通常のダウンロード処理、指定フォルダにまとめてZIP化して追加"
+            ZIP_NAME="music_files_$(date +%Y%m%d%H%M%S).zip"
+            zip -r downloads/$ZIP_NAME downloads/*
+            git add downloads/$ZIP_NAME
           fi
 
       - name: 変更の確認とコミット
