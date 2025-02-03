@@ -66,7 +66,7 @@ jobs:
         run: |
           IFS=',' read -r -a URL_ARRAY <<< "$INPUT_URL"
           for url in "${URL_ARRAY[@]}"; do
-            python downloader.py "music_files" "$url" "$INPUT_SCRAPE_LINKS" "$INPUT_SOURCE_TYPE"
+            python downloader.py "downloads" "$url" "$INPUT_SCRAPE_LINKS" "$INPUT_SOURCE_TYPE"
           done
 
       - name: ダウンロードされたファイルの確認
@@ -74,16 +74,14 @@ jobs:
           echo "ダウンロードされたファイル:"
           ls -la downloads/
 
-      - name: ファイルの処理とGitへの追加
+      - name: ファイルの処理とZIP化
         env:
           INPUT_ZIP_NAME: ${{ github.event.inputs.zip_name }}
         run: |
-          echo "通常のダウンロード処理、指定フォルダにまとめてZIP化して追加"
-          ZIP_NAME="${INPUT_ZIP_NAME:-music_files}_$(date +%Y%m%d%H%M%S).zip"
-          zip -r "downloads/$ZIP_NAME" downloads/* || { echo "ZIP作成に失敗しました"; exit 1; }
-          
-          # ZIPファイルのみGitに追加
-          git add downloads/*.zip
+          ZIP_NAME="${INPUT_ZIP_NAME:-music_files}.zip"
+          zip -r "$ZIP_NAME" downloads/* || { echo "ZIP作成に失敗しました"; exit 1; }
+          mv "$ZIP_NAME" downloads/
+          git add "downloads/$ZIP_NAME"
 
       - name: 変更の確認とコミット
         run: |
