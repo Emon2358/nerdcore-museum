@@ -97,11 +97,14 @@ class MusicDownloader:
             })
 
         try:
-            with yt_d lp.YoutubeDL(ydl_opts) as ydl:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # 修正された行
                 ydl.download([url])
             return True
-        except Exception as e:
+        except yt_dlp.utils.DownloadError as e:
             logger.error(f"ダウンロード中にエラーが発生: {str(e)}")
+            return False
+        except Exception as e:
+            logger.error(f"予期しないエラーが発生: {str(e)}")
             return False
 
     def download_direct_link(self, url):
