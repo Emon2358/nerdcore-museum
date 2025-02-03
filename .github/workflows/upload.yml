@@ -22,8 +22,11 @@ on:
           - bandcamp
           - archive
           - direct_link
-          - zip
         default: auto_detect
+      zip_name:
+        description: '生成するZIPファイルの名前'
+        required: true
+        type: string
 
 jobs:
   download:
@@ -32,7 +35,7 @@ jobs:
       - name: リポジトリをチェックアウト
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # 完全な履歴を取得
 
       - name: Gitの設定
         run: |
@@ -47,28 +50,30 @@ jobs:
       - name: Pythonの依存関係をインストール
         run: |
           python -m pip install --upgrade pip
+          pip install \
+            yt-dlp \
+            setuptools \
+            wheel
+
+      - name: 必要なパッケージをインストール
+        run: |
           pip install yt-dlp requests beautifulsoup4
           sudo apt-get update
-          sudo apt-get install -y ffmpeg unzip
+          sudo apt-get install -y ffmpeg
 
       - name: downloadsディレクトリの作成
         run: mkdir -p downloads
 
-      - name: 音楽をダウンロードまたはZIPを処理
+      - name: 音楽をダウンロード
         env:
           INPUT_URL: ${{ github.event.inputs.url }}
           INPUT_SCRAPE_LINKS: ${{ github.event.inputs.scrape_internal_links }}
           INPUT_SOURCE_TYPE: ${{ github.event.inputs.source_type }}
         run: |
+          # カンマ区切りのURLを分割して配列に格納
           IFS=',' read -r -a URL_ARRAY <<< "$INPUT_URL"
           for url in "${URL_ARRAY[@]}"; do
-            if [[ "$INPUT_SOURCE_TYPE" == "zip" ]]; then
-              wget -O temp.zip "$url"
-              unzip temp.zip -d downloads/
-              rm temp.zip
-            else
-              python downloader.py "$url" "$INPUT_SCRAPE_LINKS" "$INPUT_SOURCE_TYPE"
-            fi
+            python downloader.py "$url" "$INPUT_SCRAPE_LINKS" "$INPUT_SOURCE_TYPE"
           done
 
       - name: ダウンロードされたファイルの確認
@@ -78,11 +83,17 @@ jobs:
 
       - name: ファイルの存在確認とGitへの追加
         run: |
-          if [ -n "$(ls -A downloads)" ]; then
-            echo "アップロードするファイルが見つかりました"
-            git add downloads/*
+          # 音楽ファイルを見つけて配列に格納
+          IFS=$'\n' read -d '' -r -a MUSIC_FILES < <(find downloads -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.m4a" \) && printf '\0')
+
+          if [ ${#MUSIC_FILES[@]} -gt 0 ]; then
+            echo "音楽ファイルが見つかりました"
+            for file in "${MUSIC_FILES[@]}"; do
+              echo "追加するファイル: $file"
+              git add "$file"
+            done
           else
-            echo "ファイルが見つかりません"
+            echo "音楽ファイルが見つかりません"
             exit 1
           fi
 
@@ -93,6 +104,26 @@ jobs:
             exit 0
           else
             echo "変更をコミットします"
-            git commit -m "📂 新しい音楽ファイルまたはZIPフォルダを追加 [skip ci]"
+            git commit -m "🎵 新しい音楽ファイルを追加 [skip ci]"
             git push origin HEAD:main
           fi
+
+      - name: ZIPファイルを作成してアップロード
+        run: |
+          # ダウンロードしたファイルをzip_nameとして圧縮
+          ZIP_NAME="${{ github.event.inputs.zip_name }}.zip"
+          
+          # 音楽ファイルをzipファイルに圧縮
+          if [ -d "downloads" ]; then
+            zip -r "$ZIP_NAME" downloads/*
+            echo "ZIPファイル作成完了: $ZIP_NAME"
+          else
+            echo "downloadsディレクトリが見つかりません。"
+            exit 1
+          fi
+
+      - name: アップロードZIPファイルをGitHubにアップロード
+        uses: actions/upload-artifact@v3
+        with:
+          name: music-archive
+          path: ${{ github.workspace }}/$ZIP_NAME
