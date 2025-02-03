@@ -69,15 +69,19 @@ jobs:
       - name: 音楽ファイルをGitに追加 & プッシュ
         run: |
           set +e
+          # 音楽ファイルを検索して追加
+          files_added=false
           find downloads/filtered -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.flac" -o -name "*.m4a" \) | while read file; do
             echo "🎵 追加するファイル: $file"
             git add "$file"
-            
-            if git status --porcelain | grep -q "$file"; then
-              git commit -m "🎵 新しい音楽ファイルを追加: $(basename "$file") [skip ci]" || true
-              git pull --rebase origin main || true
-              git push origin HEAD:main || true
-            else
-              echo "⚠️ 変更がないためコミットをスキップ: $file"
-            fi
+            files_added=true
           done
+
+          # 変更があった場合のみコミットとプッシュを実行
+          if [ "$files_added" = true ]; then
+            git commit -m "🎵 新しい音楽ファイルを追加: [skip ci]"
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          else
+            echo "⚠️ 変更がないためコミットをスキップ"
+          fi
