@@ -25,8 +25,7 @@ class LinkParser(HTMLParser):
             for name, value in attrs:
                 if name == 'href' and (
                     value.endswith('.mp3') or 
-                    value.endswith('.wav') or 
-                    value.endswith('.flac') or 
+                    value.endswith('.wav') or  
                     value.endswith('.m4a')
                 ):
                     full_url = urljoin(self.base_url, value)
