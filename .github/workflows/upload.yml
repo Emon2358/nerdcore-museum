@@ -79,9 +79,11 @@ jobs:
           INPUT_ZIP_NAME: ${{ github.event.inputs.zip_name }}
         run: |
           echo "通常のダウンロード処理、指定フォルダにまとめてZIP化して追加"
-          ZIP_NAME="${INPUT_ZIP_NAME}_$(date +%Y%m%d%H%M%S).zip"
-          zip -r downloads/$ZIP_NAME downloads/*
-          git add downloads/$ZIP_NAME
+          ZIP_NAME="${INPUT_ZIP_NAME:-music_files}_$(date +%Y%m%d%H%M%S).zip"
+          zip -r "downloads/$ZIP_NAME" downloads/* || { echo "ZIP作成に失敗しました"; exit 1; }
+          
+          # ZIPファイルのみGitに追加
+          git add downloads/*.zip
 
       - name: 変更の確認とコミット
         run: |
