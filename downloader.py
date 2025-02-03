@@ -2,7 +2,6 @@ import os
 import sys
 import yt_dlp
 import logging
-import shutil
 from urllib.request import urlopen
 from urllib.parse import urljoin
 from html.parser import HTMLParser
@@ -12,8 +11,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ダウンロードフォルダ
-BASE_DOWNLOAD_DIR = "downloads"
-os.makedirs(BASE_DOWNLOAD_DIR, exist_ok=True)
+DOWNLOAD_DIR = "downloads"
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 class LinkParser(HTMLParser):
     def __init__(self, base_url):
@@ -33,12 +32,10 @@ class LinkParser(HTMLParser):
                     self.links.append(full_url)
 
 class MusicDownloader:
-    def __init__(self, output_dir):
-        self.output_dir = os.path.join(BASE_DOWNLOAD_DIR, output_dir)
-        os.makedirs(self.output_dir, exist_ok=True)
+    def __init__(self):
         self.ydl_opts = {
             'format': 'bestaudio/best',
-            'outtmpl': f'{self.output_dir}/%(title)s.%(ext)s',
+            'outtmpl': f'{DOWNLOAD_DIR}/%(title)s.%(ext)s',
             'extract_flat': False,
             'noplaylist': False,
             'ignoreerrors': False,
@@ -47,24 +44,40 @@ class MusicDownloader:
         }
 
     def download(self, url, scrape_internal_links=False, source_type='auto_detect'):
+        """指定されたURLからトラックをダウンロード"""
         try:
             logger.info(f"🎵 解析とダウンロードを開始: {url}")
+            
+            # ソースタイプの判定
             if source_type == 'auto_detect':
                 source_type = self.detect_source_type(url)
             
+            # ソースタイプに基づいたダウンロード
+            if source_type in ['soundcloud', 'bandcamp', 'direct_link']:
+                if not any(platform in url for platform in ['soundcloud.com', 'bandcamp.com']):
+                    logger.error("🚫 SoundCloudまたはBandcampのURLを指定してください。")
+                    return False
+            
+            # スクレイピングして内部リンクを取得
             internal_links = []
             if scrape_internal_links or source_type == 'archive':
                 internal_links = self.scrape_internal_links(url)
             
+            # URLをダウンロード
             self.download_track(url)
+            
+            # スクレイピングしたリンクもダウンロード
             for link in internal_links:
                 self.download_track(link)
+                
             return True
+            
         except Exception as e:
-            logger.error(f"⚠️ 予期せぬエラー: {str(e)}")
+            logger.error(f"⚠️ 予期せぬエラーが発生: {str(e)}")
             return False
 
     def detect_source_type(self, url):
+        """URLからソースタイプを自動検出"""
         if 'archive.org' in url:
             return 'archive'
         elif 'soundcloud.com' in url:
@@ -75,51 +88,52 @@ class MusicDownloader:
             return 'direct_link'
 
     def scrape_internal_links(self, url):
-        logger.info(f"🔍 内部リンクを取得: {url}")
+        """指定されたURLから内部リンクをスクレイピング"""
+        logger.info(f"🔍 内部リンクをスクレイピング中: {url}")
+        
+        # URLからHTMLを取得
         try:
             with urlopen(url) as response:
                 html = response.read().decode('utf-8')
         except Exception as e:
-            logger.error(f"URL取得失敗: {e}")
+            logger.error(f"URLを開けませんでした: {e}")
             return []
+
+        # リンクを解析
         parser = LinkParser(url)
         parser.feed(html)
+        
+        logger.info(f"✨ 見つかった内部リンク: {parser.links}")
         return parser.links
 
     def download_track(self, url):
+        """トラックをダウンロード"""
         with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
             try:
                 info = ydl.extract_info(url, download=True)
-                logger.info(f"✅ ダウンロード完了: {info.get('title', 'Unknown')}")
+                logger.info(f"✅ トラック「{info.get('title', 'Unknown')}」のダウンロードが完了しました！")
             except Exception as e:
-                logger.error(f"⚠️ ダウンロードエラー: {str(e)}")
-
-    def create_zip(self, zip_name):
-        zip_path = os.path.join(BASE_DOWNLOAD_DIR, f"{zip_name}.zip")
-        shutil.make_archive(zip_path.replace('.zip', ''), 'zip', self.output_dir)
-        logger.info(f"📦 ZIP作成: {zip_path}")
-        return zip_path
+                logger.error(f"⚠️ ダウンロード中にエラーが発生: {str(e)}")
 
 def main():
-    if len(sys.argv) < 5:
-        logger.error("❌ 必須引数が不足しています。")
-        print("使用: python downloader.py <ZIP名> <URL1> <URL2> ... <scrape_internal_links> <source_type>")
+    if len(sys.argv) < 4:
+        logger.error("❌ URLとダウンロード方法、ソースタイプが指定されていません。")
+        print("使用方法: python downloader.py <URL1> <URL2> ... <scrape_internal_links> <source_type>")
         sys.exit(1)
-    
-    zip_name = sys.argv[1]
+
+    # 最後の2つの引数を取得
     scrape_internal_links = sys.argv[-2].lower() == 'true'
     source_type = sys.argv[-1]
-    urls = sys.argv[2:-2]
-    
-    downloader = MusicDownloader(zip_name)
+
+    # 最初の引数からURLを取得
+    urls = sys.argv[1:-2]
+
+    downloader = MusicDownloader()
     
     for url in urls:
         success = downloader.download(url, scrape_internal_links, source_type)
         if not success:
-            logger.error(f"❌ {url} のダウンロード失敗。")
-    
-    zip_path = downloader.create_zip(zip_name)
-    logger.info(f"✅ 完了: {zip_path}")
+            logger.error(f"❌ {url} のダウンロードに失敗しました。")
 
 if __name__ == "__main__":
     main()
