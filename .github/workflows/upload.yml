@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       zip_url:
-        description: 'ダウンロードするZIPファイルのURL'
-        required: true
+        description: 'ダウンロードするZIPファイルのURL（省略可能）'
+        required: false
         type: string
       zip_filename:
-        description: 'ダウンロードするZIPファイルの名前'
-        required: true
+        description: 'ダウンロードするZIPファイルの名前（省略可能）'
+        required: false
         type: string
       url:
         description: 'ダウンロードする音楽URLをカンマ区切りで入力'
@@ -39,6 +39,7 @@ on:
 jobs:
   download_zip:
     runs-on: ubuntu-latest
+    if: ${{ inputs.zip_url }}  # zip_urlが入力されている場合にのみ実行
     steps:
       - name: リポジトリをチェックアウト
         uses: actions/checkout@v4
@@ -140,4 +141,3 @@ jobs:
           git add "${{ github.event.inputs.zip_filename_music }}.zip"
           git commit -m "Add music ZIP"
           git push origin HEAD:main
-
