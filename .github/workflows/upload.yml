@@ -3,6 +3,10 @@ name: Download Music Tracks
 on:
   workflow_dispatch:
     inputs:
+      folder_name:
+        description: 'ダウンロードフォルダの名前'
+        required: true
+        type: string
       url:
         description: 'ダウンロードするURLをカンマ区切りで入力'
         required: true
@@ -22,6 +26,7 @@ on:
           - bandcamp
           - archive
           - direct_link
+          - vk
         default: auto_detect
 
 jobs:
@@ -31,7 +36,7 @@ jobs:
       - name: リポジトリをチェックアウト
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 完全な履歴を取得
+          fetch-depth: 0
 
       - name: Gitの設定
         run: |
@@ -46,41 +51,47 @@ jobs:
       - name: Pythonの依存関係をインストール
         run: |
           python -m pip install --upgrade pip
-          pip install \
-            yt-dlp \
-            setuptools \
-            wheel
-
-      - name: 必要なパッケージをインストール
-        run: |
           pip install yt-dlp requests beautifulsoup4
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg unzip
 
-      - name: downloadsディレクトリの作成
-        run: mkdir -p downloads
+      - name: 指定したフォルダを作成
+        env:
+          INPUT_FOLDER_NAME: ${{ github.event.inputs.folder_name }}
+        run: |
+          mkdir -p "downloads/$INPUT_FOLDER_NAME"
 
       - name: 音楽をダウンロード
         env:
           INPUT_URL: ${{ github.event.inputs.url }}
           INPUT_SCRAPE_LINKS: ${{ github.event.inputs.scrape_internal_links }}
           INPUT_SOURCE_TYPE: ${{ github.event.inputs.source_type }}
+          INPUT_FOLDER_NAME: ${{ github.event.inputs.folder_name }}
         run: |
-          # カンマ区切りのURLを分割して配列に格納
           IFS=',' read -r -a URL_ARRAY <<< "$INPUT_URL"
           for url in "${URL_ARRAY[@]}"; do
-            python downloader.py "$url" "$INPUT_SCRAPE_LINKS" "$INPUT_SOURCE_TYPE"
+            python downloader.py "$url" "$INPUT_SCRAPE_LINKS" "$INPUT_SOURCE_TYPE" "downloads/$INPUT_FOLDER_NAME"
+          done
+
+      - name: VKのzipを解凍 (必要な場合)
+        env:
+          INPUT_FOLDER_NAME: ${{ github.event.inputs.folder_name }}
+        run: |
+          for zipfile in downloads/$INPUT_FOLDER_NAME/*.zip; do
+            if [ -f "$zipfile" ]; then
+              unzip -o "$zipfile" -d "downloads/$INPUT_FOLDER_NAME"
+              rm "$zipfile"
+            fi
           done
 
       - name: ダウンロードされたファイルの確認
         run: |
-          echo "ダウンロードされたファイル:"
-          ls -la downloads/
+          echo "ダウンロードされたファイル一覧:"
+          ls -la downloads/${{ github.event.inputs.folder_name }}/
 
-      - name: ファイルの存在確認とGitへの追加
+      - name: 音楽ファイルのGit管理
         run: |
-          # 音楽ファイルを見つけて配列に格納
-          IFS=$'\n' read -d '' -r -a MUSIC_FILES < <(find downloads -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.m4a" \) && printf '\0')
+          IFS=$'\n' read -d '' -r -a MUSIC_FILES < <(find downloads/${{ github.event.inputs.folder_name }} -type f \( -name "*.mp3" -o -name "*.flac" -o -name "*.m4a" -o -name "*.wav" \) && printf '\0')
 
           if [ ${#MUSIC_FILES[@]} -gt 0 ]; then
             echo "音楽ファイルが見つかりました"
@@ -100,6 +111,6 @@ jobs:
             exit 0
           else
             echo "変更をコミットします"
-            git commit -m "🎵 新しい音楽ファイルを追加 [skip ci]"
+            git commit -m "🎵 新しい音楽ファイルを追加 (${INPUT_FOLDER_NAME}) [skip ci]"
             git push origin HEAD:main
           fi
