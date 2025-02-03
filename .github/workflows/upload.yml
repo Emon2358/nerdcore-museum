@@ -112,7 +112,11 @@ jobs:
           INPUT_SCRAPE_LINKS: ${{ github.event.inputs.scrape_internal_links }}
           INPUT_SOURCE_TYPE: ${{ github.event.inputs.source_type }}
         run: |
-          if [ "$INPUT_SOURCE_TYPE" == "soundcloud" ]; then
+          # 特定のvk.com URLの場合、ZIPファイルとして直接ダウンロード
+          if [[ "$INPUT_URL" == https://vk.com/doc* ]]; then
+            echo "VKのURLを検出しました。ZIPファイルを直接ダウンロード中..."
+            curl -L "$INPUT_URL" -o "downloads/music.zip"
+          elif [ "$INPUT_SOURCE_TYPE" == "soundcloud" ]; then
             echo "SoundCloud URLを処理中..."
             # SoundCloud用のダウンロードスクリプトを実行
             python downloader_soundcloud.py "$INPUT_URL"
