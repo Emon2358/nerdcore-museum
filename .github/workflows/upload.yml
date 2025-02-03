@@ -1,18 +1,10 @@
-name: Download ZIP and Music Tracks
+name: Download Music Tracks
 
 on:
   workflow_dispatch:
     inputs:
-      zip_url:
-        description: 'ダウンロードするZIPファイルのURL（省略可能）'
-        required: false
-        type: string
-      zip_filename:
-        description: 'ダウンロードするZIPファイルの名前（省略可能）'
-        required: false
-        type: string
       url:
-        description: 'ダウンロードする音楽URLをカンマ区切りで入力'
+        description: 'ダウンロードするURLをカンマ区切りで入力'
         required: true
         type: string
       scrape_internal_links:
@@ -31,62 +23,21 @@ on:
           - archive
           - direct_link
         default: auto_detect
-      zip_filename_music:
-        description: '作成する音楽ZIPファイルの名前'
-        required: true
-        type: string
 
 jobs:
-  download_zip:
+  download:
     runs-on: ubuntu-latest
-    if: ${{ inputs.zip_url }}  # zip_urlが入力されている場合にのみ実行
     steps:
       - name: リポジトリをチェックアウト
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 完全な履歴を取得
 
       - name: Gitの設定
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: ダウンロードディレクトリを作成
-        run: |
-          mkdir -p downloads
-
-      # ZIPファイルのダウンロード
-      - name: ZIPファイルをダウンロード
-        run: |
-          curl -L "${{ github.event.inputs.zip_url }}" -o "downloads/${{ github.event.inputs.zip_filename }}.zip"
-
-      - name: ダウンロードされたZIPファイルの確認
-        run: |
-          ls -la downloads/
-
-      # ZIPファイルをリポジトリにアップロード
-      - name: リポジトリにZIPファイルをアップロード
-        run: |
-          git add "downloads/${{ github.event.inputs.zip_filename }}.zip"
-          git commit -m "Add downloaded ZIP"
-          git push origin HEAD:main
-
-  download_music:
-    runs-on: ubuntu-latest
-    if: ${{ !inputs.zip_url }}  # zip_urlが指定されていない場合に実行
-    needs: download_zip  # download_zipジョブが完了してから実行
-    steps:
-      - name: リポジトリをチェックアウト
-        uses: actions/checkout@v4
-
-      - name: Gitの設定
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: ダウンロードディレクトリを作成
-        run: |
-          mkdir -p downloads
-
-      # 音楽ファイルのダウンロード
       - name: Pythonをセットアップ
         uses: actions/setup-python@v4
         with:
@@ -95,66 +46,53 @@ jobs:
       - name: Pythonの依存関係をインストール
         run: |
           python -m pip install --upgrade pip
-          pip install \
-            yt-dlp \
-            setuptools \
-            wheel
-
-      - name: 必要なパッケージをインストール
-        run: |
           pip install yt-dlp requests beautifulsoup4
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
-      - name: 音楽をダウンロード（ソースタイプに応じた処理）
+      - name: downloadsディレクトリの作成
+        run: mkdir -p downloads
+
+      - name: 音楽をダウンロード
         env:
           INPUT_URL: ${{ github.event.inputs.url }}
           INPUT_SCRAPE_LINKS: ${{ github.event.inputs.scrape_internal_links }}
           INPUT_SOURCE_TYPE: ${{ github.event.inputs.source_type }}
         run: |
-          # 特定のvk.com URLの場合、ZIPファイルとして直接ダウンロード
-          if [[ "$INPUT_URL" == https://vk.com/doc* ]]; then
-            echo "VKのURLを検出しました。ZIPファイルを直接ダウンロード中..."
-            curl -L "$INPUT_URL" -o "downloads/music.zip"
-          elif [ "$INPUT_SOURCE_TYPE" == "soundcloud" ]; then
-            echo "SoundCloud URLを処理中..."
-            # SoundCloud用のダウンロードスクリプトを実行
-            python downloader_soundcloud.py "$INPUT_URL"
-          elif [ "$INPUT_SOURCE_TYPE" == "bandcamp" ]; then
-            echo "Bandcamp URLを処理中..."
-            # Bandcamp用のダウンロードスクリプトを実行
-            python downloader_bandcamp.py "$INPUT_URL"
-          elif [ "$INPUT_SOURCE_TYPE" == "archive" ]; then
-            echo "Archive URLを処理中..."
-            # Archive用のダウンロードスクリプトを実行
-            python downloader_archive.py "$INPUT_URL"
-          else
-            echo "自動検出によるダウンロード..."
-            # 自動検出（auto_detect）の処理を実行
-            python downloader_auto_detect.py "$INPUT_URL"
-          fi
+          IFS=',' read -r -a URL_ARRAY <<< "$INPUT_URL"
+          for url in "${URL_ARRAY[@]}"; do
+            python downloader.py "music_files" "$url" "$INPUT_SCRAPE_LINKS" "$INPUT_SOURCE_TYPE"
+          done
 
       - name: ダウンロードされたファイルの確認
         run: |
           echo "ダウンロードされたファイル:"
           ls -la downloads/
 
-      - name: ダウンロードファイルを指定のフォルダにまとめる
+      - name: ファイルの処理とGitへの追加
         run: |
-          FOLDER_NAME="${{ github.event.inputs.zip_filename_music }}"
-          mkdir -p "downloads/$FOLDER_NAME"
-          find downloads -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.m4a" \) -exec mv {} "downloads/$FOLDER_NAME/" \;
+          if [[ "$INPUT_SOURCE_TYPE" == "direct_link" && "$INPUT_URL" =~ ^https:\/\/vk\.com\/ ]]; then
+            echo "VKリンクのため、ZIP化せずに直接追加"
+            IFS=$'\n' read -d '' -r -a MUSIC_FILES < <(find downloads -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.m4a" \) && printf '\0')
+            if [ ${#MUSIC_FILES[@]} -gt 0 ]; then
+              git add downloads/*
+            else
+              echo "音楽ファイルが見つかりません"
+              exit 1
+            fi
+          else
+            echo "通常のダウンロード処理、ZIP化して追加"
+            zip -r downloads/music_files.zip downloads/*
+            git add downloads/music_files.zip
+          fi
 
-      - name: 音楽ZIPファイルを作成
+      - name: 変更の確認とコミット
         run: |
-          FOLDER_NAME="${{ github.event.inputs.zip_filename_music }}"
-          ZIP_NAME="${FOLDER_NAME}.zip"
-          cd downloads && zip -r "$ZIP_NAME" "$FOLDER_NAME"
-          mv "downloads/$ZIP_NAME" .
-
-      # 音楽ZIPファイルをリポジトリにアップロード
-      - name: リポジトリに音楽ZIPファイルをアップロード
-        run: |
-          git add "${{ github.event.inputs.zip_filename_music }}.zip"
-          git commit -m "Add music ZIP"
-          git push origin HEAD:main
+          if git diff --cached --quiet; then
+            echo "コミットする変更はありません"
+            exit 0
+          else
+            echo "変更をコミットします"
+            git commit -m "🎵 新しい音楽ファイルを追加 [skip ci]"
+            git push origin HEAD:main
+          fi
