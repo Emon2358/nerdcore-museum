@@ -7,7 +7,7 @@ import shutil
 import yt_dlp
 import logging
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, quote
 
 # ロギングの設定
 logging.basicConfig(
@@ -64,6 +64,9 @@ class MusicDownloader:
 
     def download_with_yt_dlp(self, url, source_type):
         """yt-dlpを使用して音楽をダウンロード"""
+        # URLをエンコード
+        encoded_url = quote(url, safe=':/')
+
         ydl_opts = {
             'format': 'bestaudio/best',
             'postprocessors': [{
@@ -97,8 +100,8 @@ class MusicDownloader:
             })
 
         try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # 修正された行
-                ydl.download([url])
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download ([encoded_url])  # 修正された行
             return True
         except yt_dlp.utils.DownloadError as e:
             logger.error(f"ダウンロード中にエラーが発生: {str(e)}")
