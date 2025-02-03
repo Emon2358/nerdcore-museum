@@ -69,9 +69,10 @@ jobs:
           git commit -m "Add downloaded ZIP"
           git push origin HEAD:main
 
-  download_and_zip_music:
+  download_music:
     runs-on: ubuntu-latest
-    needs: download_zip
+    if: ${{ !inputs.zip_url }}  # zip_urlが指定されていない場合に実行
+    needs: download_zip  # download_zipジョブが完了してから実行
     steps:
       - name: リポジトリをチェックアウト
         uses: actions/checkout@v4
@@ -105,17 +106,29 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
-      - name: 音楽をダウンロード
+      - name: 音楽をダウンロード（ソースタイプに応じた処理）
         env:
           INPUT_URL: ${{ github.event.inputs.url }}
           INPUT_SCRAPE_LINKS: ${{ github.event.inputs.scrape_internal_links }}
           INPUT_SOURCE_TYPE: ${{ github.event.inputs.source_type }}
         run: |
-          # カンマ区切りのURLを分割して配列に格納
-          IFS=',' read -r -a URL_ARRAY <<< "$INPUT_URL"
-          for url in "${URL_ARRAY[@]}"; do
-            python downloader.py "$url" "$INPUT_SCRAPE_LINKS" "$INPUT_SOURCE_TYPE"
-          done
+          if [ "$INPUT_SOURCE_TYPE" == "soundcloud" ]; then
+            echo "SoundCloud URLを処理中..."
+            # SoundCloud用のダウンロードスクリプトを実行
+            python downloader_soundcloud.py "$INPUT_URL"
+          elif [ "$INPUT_SOURCE_TYPE" == "bandcamp" ]; then
+            echo "Bandcamp URLを処理中..."
+            # Bandcamp用のダウンロードスクリプトを実行
+            python downloader_bandcamp.py "$INPUT_URL"
+          elif [ "$INPUT_SOURCE_TYPE" == "archive" ]; then
+            echo "Archive URLを処理中..."
+            # Archive用のダウンロードスクリプトを実行
+            python downloader_archive.py "$INPUT_URL"
+          else
+            echo "自動検出によるダウンロード..."
+            # 自動検出（auto_detect）の処理を実行
+            python downloader_auto_detect.py "$INPUT_URL"
+          fi
 
       - name: ダウンロードされたファイルの確認
         run: |
