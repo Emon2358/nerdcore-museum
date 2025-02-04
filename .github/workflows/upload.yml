@@ -102,7 +102,7 @@ jobs:
             echo "変更をコミットします"
             git commit -m "🎵 新しい音楽ファイルを追加 [skip ci]"
             # リモートの変更を取得してマージ
-            git pull origin main
+            git pull origin main --rebase
             # マージが成功したらプッシュ
             git push origin HEAD:main
           fi
