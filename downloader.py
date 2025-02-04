@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ダウンロードフォルダ
-DOWNLOAD_DIR = "downloads"
+DOWNLOAD_DIR = "downloads2"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 class LinkParser(HTMLParser):
