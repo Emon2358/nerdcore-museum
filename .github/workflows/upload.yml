@@ -58,7 +58,7 @@ jobs:
           sudo apt-get install -y ffmpeg
 
       - name: downloadsディレクトリの作成
-        run: mkdir -p downloads2
+        run: mkdir -p downloads
 
       - name: 音楽をダウンロード
         env:
@@ -75,7 +75,7 @@ jobs:
       - name: ダウンロードされたファイルの確認
         run: |
           echo "ダウンロードされたファイル:"
-          ls -la downloads2/
+          ls -la downloads/
 
       - name: ファイルの存在確認とGitへの追加
         run: |
